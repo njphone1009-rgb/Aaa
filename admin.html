@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>لوحة التحكم - إدارة المنيو</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+body{
+    font-family:'Cairo',sans-serif;
+    background:#1a1a1a;
+    color:#fff;
+    margin:0;
+    padding:20px;
+}
+h1{
+    text-align:center;
+    color:#c9a45a;
+    margin-bottom:25px;
+}
+.box{
+    background:#222;
+    border:1px solid #c9a45a44;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:22px;
+}
+.box h2{
+    color:#c9a45a;
+    margin-top:0;
+}
+input,select{
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #555;
+    background:#111;
+    color:#fff;
+    margin:7px 0;
+}
+button{
+    background:#c9a45a;
+    color:#000;
+    padding:10px 20px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+}
+button:hover{
+    opacity:.8;
+}
+.small-btn{
+    background:#444;
+    color:#fff;
+    padding:6px 10px;
+    border-radius:6px;
+    cursor:pointer;
+    border:none;
+    font-size:13px;
+}
+.preview-img{
+    max-width:180px;
+    border-radius:10px;
+    display:block;
+    margin-top:10px;
+}
+.section-item{
+    background:#111;
+    padding:15px;
+    border-radius:10px;
+    border:1px solid #333;
+    margin-top:15px;
+}
+.product-item{
+    margin-top:10px;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #333;
+}
+.product-item img{
+    max-width:70px;
+    border-radius:8px;
+    margin-left:6px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>لوحة التحكم — إدارة المنيو</h1>
+
+<!-- إضافة قسم -->
+<div class="box">
+  <h2>إضافة قسم جديد</h2>
+  <input id="secName" placeholder="مثال: كيك">
+  <button id="addSecBtn">إضافة قسم</button>
+</div>
+
+<!-- إضافة منتج -->
+<div class="box">
+  <h2>إضافة منتج جديد</h2>
+
+  <label>اختر القسم</label>
+  <select id="prodSec"></select>
+
+  <input id="prodName" placeholder="اسم المنتج">
+  <input id="prodPrice" type="number" placeholder="السعر">
+
+  <label>رفع صورة المنتج</label>
+  <input id="prodImgFile" type="file" accept="image/*">
+
+  <img id="preview" class="preview-img" src="" style="display:none;">
+
+  <button id="addProdBtn" style="margin-top:10px;">إضافة المنتج</button>
+  <button id="clearStorage" class="small-btn">مسح كل البيانات (reset)</button>
+</div>
+
+<!-- البحث -->
+<div class="box">
+  <h2>🔍 بحث عن منتج</h2>
+  <input id="searchInput" placeholder="أدخل اسم المنتج للبحث...">
+</div>
+
+<!-- قائمة المنتجات -->
+<div class="box">
+  <h2>الأقسام والمنتجات</h2>
+  <div id="list"></div>
+</div>
+
+
+<script>
+let menu = JSON.parse(localStorage.getItem("menuData")) || {};
+
+const prodSec = document.getElementById('prodSec');
+const list = document.getElementById('list');
+const preview = document.getElementById('preview');
+const searchInput = document.getElementById('searchInput');
+
+function saveMenu(){
+  localStorage.setItem("menuData", JSON.stringify(menu));
+  loadUI();
+}
+
+document.getElementById('addSecBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('secName').value.trim();
+  if(!name) return alert("أدخل اسم القسم");
+  if(menu[name]) return alert("القسم موجود");
+
+  menu[name] = [];
+  document.getElementById('secName').value="";
+  saveMenu();
+});
+
+document.getElementById('prodImgFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    preview.src = ev.target.result;
+    preview.style.display="block";
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('addProdBtn').addEventListener('click', async ()=>{
+  const sec = prodSec.value;
+  const name = document.getElementById('prodName').value.trim();
+  const price = Number(document.getElementById('prodPrice').value);
+  const file = document.getElementById('prodImgFile').files[0];
+
+  if(!sec) return alert("اختر القسم");
+  if(!name || !price) return alert("أكمل الاسم والسعر");
+
+  let imageValue = "";
+  if(file){
+    imageValue = await fileToDataURL(file);
+  }
+
+  menu[sec].push({ name, price, img:imageValue });
+
+  document.getElementById('prodName').value="";
+  document.getElementById('prodPrice').value="";
+  document.getElementById('prodImgFile').value="";
+  preview.style.display="none";
+
+  saveMenu();
+});
+
+function fileToDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadUI(){
+  list.innerHTML="";
+  prodSec.innerHTML="";
+
+  const search = searchInput.value.trim().toLowerCase();
+
+  const keys = Object.keys(menu);
+
+  keys.forEach(sec=>{
+    prodSec.innerHTML += `<option value="${sec}">${sec}</option>`;
+
+    // إنشاء قسم
+    const secDiv = document.createElement('div');
+    secDiv.className="section-item";
+    secDiv.innerHTML = `
+      <h3 style="color:#c9a45a;">
+        ${sec}
+        <button data-sec="${sec}" class="small-btn" style="float:left">حذف القسم</button>
+      </h3>
+    `;
+
+    // المنتجات
+    menu[sec].forEach((p, idx)=>{
+      if(search && !p.name.toLowerCase().includes(search)) return;
+
+      const item = document.createElement('div');
+      item.className="product-item";
+
+      item.innerHTML = `
+        <img src="${p.img}">
+        <strong>${p.name}</strong> — ${p.price} ر.س
+        <div style="margin-top:6px;">
+          <button class="small-btn" data-sec="${sec}" data-idx="${idx}" data-action="edit">تعديل</button>
+          <button class="small-btn" data-sec="${sec}" data-idx="${idx}" data-action="del">حذف</button>
+        </div>
+      `;
+
+      secDiv.appendChild(item);
+    });
+
+    list.appendChild(secDiv);
+  });
+}
+
+list.addEventListener('click', e=>{
+  const btn = e.target;
+  if(btn.tagName !== 'BUTTON') return;
+
+  const sec = btn.dataset.sec;
+  const idx = btn.dataset.idx;
+  const action = btn.dataset.action;
+
+  // حذف قسم
+  if(btn.textContent.includes("حذف القسم")){
+    if(confirm("حذف القسم بالكامل؟")){
+      delete menu[sec];
+      saveMenu();
+    }
+    return;
+  }
+
+  // حذف منتج
+  if(action==="del"){
+    if(confirm("حذف المنتج؟")){
+      menu[sec].splice(idx,1);
+      saveMenu();
+    }
+    return;
+  }
+
+  // تعديل منتج
+  if(action==="edit"){
+    const prod = menu[sec][idx];
+
+    const newName = prompt("اسم المنتج:", prod.name);
+    if(newName === null) return;
+
+    const newPrice = prompt("السعر:", prod.price);
+    if(newPrice === null) return;
+
+    prod.name = newName.trim() || prod.name;
+    prod.price = Number(newPrice) || prod.price;
+
+    saveMenu();
+  }
+});
+
+document.getElementById('clearStorage').addEventListener('click',()=>{
+  if(confirm("مسح كل البيانات؟")){
+    localStorage.removeItem("menuData");
+    menu={};
+    loadUI();
+  }
+});
+
+searchInput.addEventListener('input', loadUI);
+
+loadUI();
+</script>
+
+</body>
+</html>
